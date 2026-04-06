@@ -29,6 +29,7 @@ final class GitHubUpdater
             return;
         }
 
+        add_filter('site_transient_update_plugins', [$this, 'inject_update']);
         add_filter('pre_set_site_transient_update_plugins', [$this, 'inject_update']);
         add_filter('plugins_api', [$this, 'inject_plugin_information'], 10, 3);
     }
