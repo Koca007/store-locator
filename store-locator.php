@@ -20,10 +20,16 @@ define('STORE_LOCATOR_VERSION', '0.1.0');
 define('STORE_LOCATOR_FILE', __FILE__);
 define('STORE_LOCATOR_PATH', plugin_dir_path(__FILE__));
 define('STORE_LOCATOR_URL', plugin_dir_url(__FILE__));
-/// GitHub repository in owner/repository format for automatic update checks.
-define('STORE_LOCATOR_GITHUB_REPOSITORY', 'Koca007/store-locator');
-/// Optional GitHub token for private repositories.
-define('STORE_LOCATOR_GITHUB_TOKEN', '');
+
+if (! defined('STORE_LOCATOR_GITHUB_REPOSITORY')) {
+    /// GitHub repository in owner/repository format for automatic update checks.
+    define('STORE_LOCATOR_GITHUB_REPOSITORY', 'Koca007/store-locator');
+}
+
+if (! defined('STORE_LOCATOR_GITHUB_TOKEN')) {
+    /// Optional GitHub token for private repositories.
+    define('STORE_LOCATOR_GITHUB_TOKEN', '');
+}
 
 $autoload_file = STORE_LOCATOR_PATH . 'vendor/autoload.php';
 
