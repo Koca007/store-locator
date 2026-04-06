@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Store Locator
  * Description: Store locator plugin foundation built for incremental development.
- * Version:     0.1.0
+ * Version:     1.0.0
  * Author:      Koca
  * License:     GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -16,7 +16,7 @@ if (! defined('ABSPATH')) {
     exit;
 }
 
-define('STORE_LOCATOR_VERSION', '0.1.0');
+define('STORE_LOCATOR_VERSION', '1.0.0');
 define('STORE_LOCATOR_FILE', __FILE__);
 define('STORE_LOCATOR_PATH', plugin_dir_path(__FILE__));
 define('STORE_LOCATOR_URL', plugin_dir_url(__FILE__));
