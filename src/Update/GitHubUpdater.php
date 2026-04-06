@@ -32,6 +32,7 @@ final class GitHubUpdater
         add_filter('site_transient_update_plugins', [$this, 'inject_update']);
         add_filter('pre_set_site_transient_update_plugins', [$this, 'inject_update']);
         add_filter('plugins_api', [$this, 'inject_plugin_information'], 10, 3);
+        add_action('admin_notices', [$this, 'render_plugins_page_update_notice']);
     }
 
     public function inject_update($transient)
@@ -271,5 +272,42 @@ final class GitHubUpdater
     private function get_cache_key(): string
     {
         return 'sl_github_release_' . md5($this->repository);
+    }
+
+    public function render_plugins_page_update_notice(): void
+    {
+        if (! is_admin() || ! current_user_can('update_plugins')) {
+            return;
+        }
+
+        $screen = function_exists('get_current_screen') ? get_current_screen() : null;
+
+        if (! $screen instanceof \WP_Screen || ! in_array($screen->id, ['plugins', 'plugins-network'], true)) {
+            return;
+        }
+
+        $release = $this->get_latest_release();
+
+        if ($release === null) {
+            return;
+        }
+
+        if (version_compare($release['version'], STORE_LOCATOR_VERSION, '<=')) {
+            return;
+        }
+
+        $update_url = wp_nonce_url(
+            self_admin_url('update.php?action=upgrade-plugin&plugin=' . rawurlencode($this->plugin_basename)),
+            'upgrade-plugin_' . $this->plugin_basename
+        );
+
+        $message = sprintf(
+            /* translators: 1: current version, 2: available version */
+            esc_html__('Store Locator update available. Current: %1$s, New: %2$s.', 'store-locator'),
+            esc_html(STORE_LOCATOR_VERSION),
+            esc_html($release['version'])
+        );
+
+        echo '<div class="notice notice-warning"><p>' . $message . ' <a href="' . esc_url($update_url) . '">' . esc_html__('Update now', 'store-locator') . '</a></p></div>';
     }
 }
