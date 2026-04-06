@@ -128,7 +128,7 @@
     position: absolute;
     top: 0;
     left: 0;
-    right: 0;
+    right: auto;
     width: 100%;
     max-width: none;
     min-width: 0;
@@ -183,8 +183,8 @@
 
 .sl-store-locator--details-open .sl-store-locator__map {
     width: calc(66.667% - var(--sl-details-gap));
-    left: auto;
-    right: 0;
+    left: calc(33.333% + var(--sl-details-gap));
+    right: auto;
 }
 
 .sl-details-title {
