@@ -51,6 +51,21 @@ Release flow:
    - release zip `store-locator-X.Y.Z.zip`
 4. WordPress sites with the plugin installed can update via normal **Update** button.
 
+## Import / Export
+
+- Admin path: `Stores -> Import / Export`
+- Format: CSV (Excel compatible, UTF-8 BOM, semicolon/comma import support)
+- Header row is supported (optional but recommended)
+- Sample file download is available on the Import / Export screen
+
+Supported columns:
+
+`name,address,zip,city,phone,email,website,opening_hours,latitude,longitude,status`
+
+`opening_hours` format example:
+
+`monday=07:00-16:00|tuesday=07:00-16:00|sunday=-`
+
 ## Repository
 
 - GitHub: <https://github.com/Koca007/store-locator>

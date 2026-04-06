@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace StoreLocator\Core;
 
+use StoreLocator\Admin\ImportExportPage;
 use StoreLocator\Admin\SettingsPage;
 use StoreLocator\Admin\SvgUploadSupport;
 use StoreLocator\Frontend\AssetManager;
@@ -11,6 +12,8 @@ use StoreLocator\Frontend\StoreDataProvider;
 use StoreLocator\Geocoding\GeocodingService;
 use StoreLocator\Geocoding\NominatimGeocodingProvider;
 use StoreLocator\Geocoding\StoreGeocodingHandler;
+use StoreLocator\ImportExport\StoreExporter;
+use StoreLocator\ImportExport\StoreImporter;
 use StoreLocator\Meta\StoreMetaBoxes;
 use StoreLocator\PostType\StorePostType;
 use StoreLocator\Settings\SettingsRepository;
@@ -50,6 +53,11 @@ final class Loader
         $settings_repository = new SettingsRepository();
         $settings_page = new SettingsPage($settings_repository);
         $settings_page->register();
+
+        $store_importer = new StoreImporter($geocoding_service);
+        $store_exporter = new StoreExporter();
+        $import_export_page = new ImportExportPage($store_importer, $store_exporter);
+        $import_export_page->register();
 
         $svg_upload_support = new SvgUploadSupport();
         $svg_upload_support->register();
