@@ -72,7 +72,9 @@
             controller.detailsGpsLinkNode.setAttribute("href", mapsUrl);
         }
         controller.root.classList.add("sl-store-locator--details-open");
-        scheduleMapResize(controller);
+        window.setTimeout(function () {
+            controller.map.invalidateSize();
+        }, 430);
     }
 
     function closeDetailsPanel(controller) {
@@ -87,32 +89,9 @@
         if (controller.detailsGpsLinkNode) {
             controller.detailsGpsLinkNode.setAttribute("href", "#");
         }
-        scheduleMapResize(controller);
-    }
-
-    function invalidateMapSize(controller) {
-        if (!controller || !controller.map) {
-            return;
-        }
-
-        controller.map.invalidateSize({
-            pan: false,
-            animate: false
-        });
-    }
-
-    function scheduleMapResize(controller) {
-        if (!controller || !controller.map) {
-            return;
-        }
-
-        invalidateMapSize(controller);
-
-        [60, 130, 220, 320, 430, 520].forEach(function (delay) {
-            window.setTimeout(function () {
-                invalidateMapSize(controller);
-            }, delay);
-        });
+        window.setTimeout(function () {
+            controller.map.invalidateSize();
+        }, 430);
     }
 
     function createMarkerIcon(markerImage, markerColor) {
