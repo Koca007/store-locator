@@ -54,7 +54,9 @@ Release flow:
 ## Import / Export
 
 - Admin path: `Stores -> Import / Export`
-- Format: CSV (Excel compatible, UTF-8 BOM, semicolon/comma import support)
+- Import format: CSV and XLSX (Excel compatible)
+- Export format: CSV (UTF-8 BOM)
+- CSV import supports semicolon/comma delimiters
 - Header row is supported (optional but recommended)
 - Sample file download is available on the Import / Export screen
 

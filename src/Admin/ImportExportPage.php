@@ -57,7 +57,7 @@ final class ImportExportPage
         <div class="wrap">
             <h1><?php echo esc_html__('Store Import / Export', 'store-locator'); ?></h1>
             <p>
-                <?php echo esc_html__('Supported format: CSV (Excel compatible). UTF-8 and semicolon/comma delimiters are supported.', 'store-locator'); ?>
+                <?php echo esc_html__('Supported formats: CSV and XLSX (Excel compatible). CSV UTF-8 and semicolon/comma delimiters are supported.', 'store-locator'); ?>
             </p>
             <p>
                 <?php echo esc_html__('Columns:', 'store-locator'); ?>
@@ -79,8 +79,8 @@ final class ImportExportPage
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" enctype="multipart/form-data">
                 <input type="hidden" name="action" value="sl_import_stores" />
                 <?php wp_nonce_field(self::IMPORT_NONCE_ACTION, '_sl_nonce'); ?>
-                <input type="file" name="sl_import_file" accept=".csv,text/csv" required />
-                <?php submit_button(__('Import CSV', 'store-locator'), 'primary', 'submit', false); ?>
+                <input type="file" name="sl_import_file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required />
+                <?php submit_button(__('Import CSV/XLSX', 'store-locator'), 'primary', 'submit', false); ?>
             </form>
 
             <h2><?php echo esc_html__('Export stores', 'store-locator'); ?></h2>
@@ -126,14 +126,16 @@ final class ImportExportPage
 
         $extension = strtolower(pathinfo((string) $file['name'], PATHINFO_EXTENSION));
 
-        if ($extension !== 'csv') {
+        if (! in_array($extension, ['csv', 'xlsx'], true)) {
             $this->redirect_with_notice([
                 'type'    => 'error',
-                'message' => __('Import failed: only CSV is supported in this version.', 'store-locator'),
+                'message' => __('Import failed: only CSV or XLSX is supported.', 'store-locator'),
             ]);
         }
 
-        $rows = $this->importer->read_csv_rows((string) $file['tmp_name']);
+        $rows = $extension === 'xlsx'
+            ? $this->importer->read_xlsx_rows((string) $file['tmp_name'])
+            : $this->importer->read_csv_rows((string) $file['tmp_name']);
         $mapped_rows = $this->importer->map_rows($rows);
 
         if (empty($mapped_rows)) {
@@ -258,4 +260,3 @@ final class ImportExportPage
         );
     }
 }
-

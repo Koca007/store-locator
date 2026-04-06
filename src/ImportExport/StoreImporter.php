@@ -52,6 +52,79 @@ final class StoreImporter
         return $rows;
     }
 
+    public function read_xlsx_rows(string $tmp_name): array
+    {
+        $shared_strings_xml = $this->read_zip_entry($tmp_name, 'xl/sharedStrings.xml');
+        $workbook_xml = $this->read_zip_entry($tmp_name, 'xl/workbook.xml');
+        $rels_xml = $this->read_zip_entry($tmp_name, 'xl/_rels/workbook.xml.rels');
+        $sheet_path = $this->resolve_first_xlsx_sheet_path($workbook_xml, $rels_xml);
+        $sheet_xml = $this->read_zip_entry($tmp_name, $sheet_path);
+
+        if (! is_string($sheet_xml) || trim($sheet_xml) === '') {
+            return [];
+        }
+
+        $shared_strings = $this->read_xlsx_shared_strings((string) $shared_strings_xml);
+        $xml = @simplexml_load_string($sheet_xml);
+
+        if ($xml === false) {
+            return [];
+        }
+
+        $row_nodes = $xml->xpath('//*[local-name()="sheetData"]/*[local-name()="row"]');
+
+        if (! is_array($row_nodes)) {
+            return [];
+        }
+
+        $rows = [];
+
+        foreach ($row_nodes as $row_node) {
+            $row = [];
+            $cells = $row_node->xpath('./*[local-name()="c"]');
+
+            if (! is_array($cells)) {
+                continue;
+            }
+
+            $fallback_col = 0;
+
+            foreach ($cells as $cell) {
+                $ref = (string) ($cell['r'] ?? '');
+
+                if (preg_match('/^([A-Z]+)/', $ref, $matches)) {
+                    $col_index = $this->xlsx_column_to_index($matches[1]);
+                } else {
+                    $col_index = $fallback_col;
+                }
+
+                if ($col_index < 0) {
+                    $fallback_col++;
+                    continue;
+                }
+
+                $row[$col_index] = trim($this->xlsx_cell_value($cell, $shared_strings));
+                $fallback_col = $col_index + 1;
+            }
+
+            if (empty($row)) {
+                continue;
+            }
+
+            ksort($row);
+            $max_index = max(array_keys($row));
+            $normalized_row = [];
+
+            for ($i = 0; $i <= $max_index; $i++) {
+                $normalized_row[] = isset($row[$i]) ? (string) $row[$i] : '';
+            }
+
+            $rows[] = $normalized_row;
+        }
+
+        return $rows;
+    }
+
     public function map_rows(array $rows): array
     {
         $mapped = [];
@@ -317,5 +390,174 @@ final class StoreImporter
 
         update_post_meta($post_id, $meta_key, $value);
     }
-}
 
+    private function read_xlsx_shared_strings(string $shared_xml): array
+    {
+        if (trim($shared_xml) === '') {
+            return [];
+        }
+
+        $xml = @simplexml_load_string($shared_xml);
+
+        if ($xml === false) {
+            return [];
+        }
+
+        $items = $xml->xpath('//*[local-name()="si"]');
+
+        if (! is_array($items)) {
+            return [];
+        }
+
+        $strings = [];
+
+        foreach ($items as $item) {
+            $text_nodes = $item->xpath('.//*[local-name()="t"]');
+
+            if (! is_array($text_nodes)) {
+                $strings[] = '';
+                continue;
+            }
+
+            $text = '';
+
+            foreach ($text_nodes as $text_node) {
+                $text .= (string) $text_node;
+            }
+
+            $strings[] = $text;
+        }
+
+        return $strings;
+    }
+
+    private function resolve_first_xlsx_sheet_path($workbook_xml, $rels_xml): string
+    {
+        if (! is_string($workbook_xml) || ! is_string($rels_xml)) {
+            return 'xl/worksheets/sheet1.xml';
+        }
+
+        $workbook = @simplexml_load_string($workbook_xml);
+        $rels = @simplexml_load_string($rels_xml);
+
+        if ($workbook === false || $rels === false) {
+            return 'xl/worksheets/sheet1.xml';
+        }
+
+        $sheet_nodes = $workbook->xpath('//*[local-name()="sheets"]/*[local-name()="sheet"]');
+
+        if (! is_array($sheet_nodes) || ! isset($sheet_nodes[0])) {
+            return 'xl/worksheets/sheet1.xml';
+        }
+
+        $rel_id = (string) $sheet_nodes[0]->attributes('http://schemas.openxmlformats.org/officeDocument/2006/relationships')->id;
+
+        if ($rel_id === '') {
+            return 'xl/worksheets/sheet1.xml';
+        }
+
+        $rel_nodes = $rels->xpath('//*[local-name()="Relationship"][@Id="' . $rel_id . '"]');
+
+        if (! is_array($rel_nodes) || ! isset($rel_nodes[0])) {
+            return 'xl/worksheets/sheet1.xml';
+        }
+
+        $target = (string) ($rel_nodes[0]['Target'] ?? '');
+
+        if ($target === '') {
+            return 'xl/worksheets/sheet1.xml';
+        }
+
+        $target = ltrim(str_replace('\\', '/', $target), '/');
+
+        if (strpos($target, 'xl/') === 0) {
+            return $target;
+        }
+
+        return 'xl/' . $target;
+    }
+
+    private function xlsx_column_to_index(string $column): int
+    {
+        $column = strtoupper(trim($column));
+        $length = strlen($column);
+        $index = 0;
+
+        for ($i = 0; $i < $length; $i++) {
+            $char = ord($column[$i]);
+
+            if ($char < 65 || $char > 90) {
+                return -1;
+            }
+
+            $index = ($index * 26) + ($char - 64);
+        }
+
+        return $index - 1;
+    }
+
+    private function xlsx_cell_value(\SimpleXMLElement $cell, array $shared_strings): string
+    {
+        $type = (string) ($cell['t'] ?? '');
+
+        if ($type === 'inlineStr') {
+            $text_nodes = $cell->xpath('./*[local-name()="is"]/*[local-name()="t"]');
+
+            if (is_array($text_nodes) && isset($text_nodes[0])) {
+                return (string) $text_nodes[0];
+            }
+
+            return '';
+        }
+
+        $value_nodes = $cell->xpath('./*[local-name()="v"]');
+        $raw = (is_array($value_nodes) && isset($value_nodes[0])) ? (string) $value_nodes[0] : '';
+
+        if ($type === 's') {
+            $idx = (int) $raw;
+
+            return isset($shared_strings[$idx]) ? (string) $shared_strings[$idx] : '';
+        }
+
+        return $raw;
+    }
+
+    private function read_zip_entry(string $archive_path, string $entry_path)
+    {
+        if (class_exists('ZipArchive')) {
+            $zip = new \ZipArchive();
+
+            if ($zip->open($archive_path) === true) {
+                $content = $zip->getFromName($entry_path);
+                $zip->close();
+
+                if (is_string($content)) {
+                    return $content;
+                }
+            }
+        }
+
+        if (! class_exists('PclZip')) {
+            $pclzip_path = ABSPATH . 'wp-admin/includes/class-pclzip.php';
+
+            if (file_exists($pclzip_path)) {
+                require_once $pclzip_path;
+            }
+        }
+
+        if (class_exists('PclZip')) {
+            $archive = new \PclZip($archive_path);
+            $result = $archive->extract(
+                PCLZIP_OPT_BY_NAME,
+                $entry_path,
+                PCLZIP_OPT_EXTRACT_AS_STRING
+            );
+
+            if (is_array($result) && isset($result[0]['content']) && is_string($result[0]['content'])) {
+                return $result[0]['content'];
+            }
+        }
+
+        return '';
+    }
+}
