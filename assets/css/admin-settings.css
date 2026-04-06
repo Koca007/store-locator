@@ -1,0 +1,20 @@
+.sl-settings-tabs {
+    margin: 18px 0 0;
+}
+
+.sl-settings-tabs .nav-tab {
+    cursor: pointer;
+}
+
+.sl-settings-panel {
+    display: none;
+    margin-top: 14px;
+    background: #ffffff;
+    border: 1px solid #dcdcde;
+    border-radius: 8px;
+    padding: 16px 18px 8px;
+}
+
+.sl-settings-panel.is-active {
+    display: block;
+}

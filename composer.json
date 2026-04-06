@@ -1,0 +1,17 @@
+{
+    "name": "local/store-locator",
+    "description": "WordPress Store Locator plugin foundation.",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "require": {
+        "php": ">=7.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "StoreLocator\\": "src/"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    }
+}
