@@ -108,6 +108,22 @@ final class GitHubUpdater
             return $cache;
         }
 
+        $release = $this->get_latest_release_from_api();
+        if ($release === null) {
+            $release = $this->get_latest_release_from_redirect();
+        }
+
+        if ($release === null) {
+            return null;
+        }
+
+        set_transient($cache_key, $release, self::CACHE_TTL);
+
+        return $release;
+    }
+
+    private function get_latest_release_from_api(): ?array
+    {
         $endpoint = 'https://api.github.com/repos/' . $this->repository . '/releases/latest';
         $headers = [
             'Accept' => 'application/vnd.github+json',
@@ -162,9 +178,56 @@ final class GitHubUpdater
             'body' => (string) ($data['body'] ?? ''),
         ];
 
-        set_transient($cache_key, $release, self::CACHE_TTL);
-
         return $release;
+    }
+
+    private function get_latest_release_from_redirect(): ?array
+    {
+        $endpoint = 'https://github.com/' . $this->repository . '/releases/latest';
+        $response = wp_remote_head(
+            $endpoint,
+            [
+                'timeout' => 12,
+                'redirection' => 0,
+                'headers' => [
+                    'User-Agent' => 'store-locator/' . STORE_LOCATOR_VERSION,
+                ],
+            ]
+        );
+
+        if (is_wp_error($response)) {
+            return null;
+        }
+
+        $status_code = (int) wp_remote_retrieve_response_code($response);
+        if ($status_code < 300 || $status_code >= 400) {
+            return null;
+        }
+
+        $location = (string) wp_remote_retrieve_header($response, 'location');
+        if ($location === '') {
+            return null;
+        }
+
+        if (! preg_match('#/releases/tag/([^/?#]+)#', $location, $matches)) {
+            return null;
+        }
+
+        $tag = trim((string) $matches[1]);
+        $version = $this->normalize_version($tag);
+        if ($version === '') {
+            return null;
+        }
+
+        $html_url = 'https://github.com/' . $this->repository . '/releases/tag/' . $tag;
+        $package_url = 'https://github.com/' . $this->repository . '/releases/download/' . $tag . '/store-locator-' . $version . '.zip';
+
+        return [
+            'version' => $version,
+            'package_url' => $package_url,
+            'html_url' => $html_url,
+            'body' => '',
+        ];
     }
 
     private function normalize_version(string $tag): string
