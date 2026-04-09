@@ -68,6 +68,12 @@ final class ImportExportPage
                 <code>monday=07:00-16:00|tuesday=07:00-16:00|sunday=-</code>
             </p>
             <p>
+                <?php echo esc_html__('Also accepted: Hungarian multi-line format, for example "Hetfo: 07:00 - 16:30".', 'store-locator'); ?>
+            </p>
+            <p>
+                <?php echo esc_html__('Export CSV format: Cegnev, Telephely cime, Nyitvatartasi ido, Telefonszam, E-mail cim, Termekkorok.', 'store-locator'); ?>
+            </p>
+            <p>
                 <a class="button button-secondary" href="<?php echo esc_url($this->sample_download_url()); ?>">
                     <?php echo esc_html__('Download sample CSV', 'store-locator'); ?>
                 </a>

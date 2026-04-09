@@ -58,14 +58,14 @@ final class AssetManager
         wp_register_style(
             'sl-store-locator',
             STORE_LOCATOR_URL . 'assets/css/store-locator.css',
-            ['sl-leaflet', 'sl-leaflet-markercluster', 'sl-leaflet-markercluster-default'],
+            ['sl-leaflet'],
             $css_version
         );
 
         wp_register_script(
             'sl-store-locator',
             STORE_LOCATOR_URL . 'assets/js/store-locator.js',
-            ['sl-leaflet', 'sl-leaflet-markercluster'],
+            ['sl-leaflet'],
             $js_version,
             true
         );

@@ -149,7 +149,8 @@
 }
 
 .sl-store-locator__details {
-    display: block !important;
+    display: flex !important;
+    flex-direction: column;
     width: 33.333%;
     max-width: 33.333%;
     min-width: 0;
@@ -157,7 +158,7 @@
     left: 0;
     top: 0;
     height: 100%;
-    overflow: auto;
+    overflow: hidden;
     opacity: 0;
     visibility: hidden;
     transform: translateX(-100%);
@@ -177,8 +178,14 @@
     transform: translateX(0);
     width: 33.333%;
     max-width: 33.333%;
-    padding: 14px 14px 44px;
+    padding: 14px 14px 10px;
     pointer-events: auto;
+}
+
+.sl-store-locator__details-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
 }
 
 .sl-store-locator--details-open .sl-store-locator__map {
@@ -220,6 +227,15 @@
     margin: 0 0 4px 0;
     font-family: var(--sl-info-hours-font-family);
     font-size: var(--sl-info-hours-font-size);
+}
+
+.sl-details-product-ranges {
+    margin-top: 12px;
+    font-family: var(--sl-info-hours-font-family);
+    font-size: var(--sl-info-hours-font-size);
+    font-weight: var(--sl-info-hours-font-weight);
+    color: var(--sl-info-hours-color);
+    line-height: 1.35;
 }
 
 .sl-hours-day {
@@ -272,9 +288,11 @@
 }
 
 .sl-store-locator__details-gps {
-    position: absolute;
-    left: 12px;
-    bottom: 10px;
+    position: static;
+    margin-top: auto;
+    margin-left: 0;
+    margin-bottom: 0;
+    align-self: flex-start;
     border: 0;
     border-radius: 50%;
     width: 44px;

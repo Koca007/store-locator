@@ -130,6 +130,7 @@ final class StoreImporter
         $mapped = [];
         $header_map = [];
         $has_header = false;
+        $last_name = '';
 
         if (isset($rows[0]) && is_array($rows[0])) {
             $header_map = $this->build_header_map($rows[0]);
@@ -156,6 +157,25 @@ final class StoreImporter
                 foreach (StoreCsvSchema::COLUMNS as $position => $column) {
                     $normalized[$column] = isset($row[$position]) ? trim((string) $row[$position]) : '';
                 }
+            }
+
+            $has_non_name_data = false;
+
+            foreach ($normalized as $column => $value) {
+                if ($column === 'name') {
+                    continue;
+                }
+
+                if (trim((string) $value) !== '') {
+                    $has_non_name_data = true;
+                    break;
+                }
+            }
+
+            if ($normalized['name'] === '' && $last_name !== '' && $has_non_name_data) {
+                $normalized['name'] = $last_name;
+            } elseif ($normalized['name'] !== '') {
+                $last_name = $normalized['name'];
             }
 
             if ($this->is_empty_row($normalized)) {
@@ -191,7 +211,25 @@ final class StoreImporter
             $opening_hours_raw = (string) ($row['opening_hours'] ?? '');
             $latitude_raw = trim((string) ($row['latitude'] ?? ''));
             $longitude_raw = trim((string) ($row['longitude'] ?? ''));
+            $product_ranges = sanitize_text_field((string) ($row['product_ranges'] ?? ''));
             $status = StoreCsvSchema::normalize_status((string) ($row['status'] ?? 'publish'));
+            $original_address = $address;
+
+            $split_address = $this->split_combined_address($address);
+
+            if (is_array($split_address)) {
+                if ($zip === '') {
+                    $zip = $split_address['zip'];
+                }
+
+                if ($city === '') {
+                    $city = $split_address['city'];
+                }
+
+                if ($split_address['address'] !== '') {
+                    $address = $split_address['address'];
+                }
+            }
 
             if ($name === '') {
                 $errors[] = sprintf(__('Line %d: Missing required "name".', 'store-locator'), $line);
@@ -244,7 +282,12 @@ final class StoreImporter
                 $longitude = (string) (float) $longitude_raw;
             }
 
-            $existing_id = $this->find_existing_store_id($name);
+            $existing_id = $this->find_existing_store_id($name, $address, $zip, $city);
+
+            if ($existing_id === 0 && $original_address !== $address) {
+                $existing_id = $this->find_existing_store_id($name, $original_address, '', '');
+            }
+
             $post_data = [
                 'post_type'   => StorePostType::POST_TYPE,
                 'post_title'  => $name,
@@ -278,6 +321,7 @@ final class StoreImporter
             $this->update_meta_value($post_id, '_sl_opening_hours', (string) $opening_hours_parsed['json']);
             $this->update_meta_value($post_id, '_sl_latitude', $latitude);
             $this->update_meta_value($post_id, '_sl_longitude', $longitude);
+            $this->update_meta_value($post_id, '_sl_product_ranges', $product_ranges);
 
             $source_hash = $this->geocoding_service->build_source_hash($address, $zip, $city);
             $this->update_meta_value($post_id, '_sl_geocode_source_hash', $source_hash);
@@ -320,11 +364,26 @@ final class StoreImporter
     private function build_header_map(array $header_row): array
     {
         $map = [];
+        $header_aliases = $this->get_header_aliases();
 
         foreach ($header_row as $index => $value) {
-            $column = sanitize_key((string) $value);
+            $normalized = $this->normalize_header_name((string) $value);
+
+            if ($normalized === '') {
+                continue;
+            }
+
+            $column = $normalized;
 
             if (! in_array($column, StoreCsvSchema::COLUMNS, true)) {
+                if (! isset($header_aliases[$normalized])) {
+                    continue;
+                }
+
+                $column = $header_aliases[$normalized];
+            }
+
+            if (isset($map[$column])) {
                 continue;
             }
 
@@ -356,8 +415,165 @@ final class StoreImporter
         return true;
     }
 
-    private function find_existing_store_id(string $name): int
+    private function get_header_aliases(): array
     {
+        return [
+            'store_name'        => 'name',
+            'company'           => 'name',
+            'company_name'      => 'name',
+            'cegnev'            => 'name',
+            'ceg_nev'           => 'name',
+            'telephely_cime'    => 'address',
+            'telephely_cim'     => 'address',
+            'telephelycime'     => 'address',
+            'telephelycim'      => 'address',
+            'cim'               => 'address',
+            'zip_code'          => 'zip',
+            'postal_code'       => 'zip',
+            'postcode'          => 'zip',
+            'iranyitoszam'      => 'zip',
+            'city_name'         => 'city',
+            'varos'             => 'city',
+            'telepules'         => 'city',
+            'phone_number'      => 'phone',
+            'telefon'           => 'phone',
+            'telefon_szam'      => 'phone',
+            'telefonszam'       => 'phone',
+            'email_cim'         => 'email',
+            'emailcim'          => 'email',
+            'email_address'     => 'email',
+            'e_mail'            => 'email',
+            'e_mail_cim'        => 'email',
+            'url'               => 'website',
+            'weboldal'          => 'website',
+            'openinghours'      => 'opening_hours',
+            'nyitvatartas'      => 'opening_hours',
+            'nyitvatartasi_ido' => 'opening_hours',
+            'nyitvatartasiido'  => 'opening_hours',
+            'lat'               => 'latitude',
+            'szelesseg'         => 'latitude',
+            'lng'               => 'longitude',
+            'lon'               => 'longitude',
+            'hosszusag'         => 'longitude',
+            'statusz'           => 'status',
+            'allapot'           => 'status',
+            'product_range'     => 'product_ranges',
+            'product_ranges'    => 'product_ranges',
+            'productrange'      => 'product_ranges',
+            'productranges'     => 'product_ranges',
+            'termekkor'         => 'product_ranges',
+            'termekkorok'       => 'product_ranges',
+        ];
+    }
+
+    private function normalize_header_name(string $value): string
+    {
+        $value = trim($value);
+
+        if ($value === '') {
+            return '';
+        }
+
+        if (function_exists('remove_accents')) {
+            $value = remove_accents($value);
+        } elseif (function_exists('iconv')) {
+            $converted = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value);
+
+            if (is_string($converted) && $converted !== '') {
+                $value = $converted;
+            }
+        }
+
+        $value = strtolower($value);
+        $value = preg_replace('/[^a-z0-9]+/u', '_', $value);
+
+        if (! is_string($value)) {
+            return '';
+        }
+
+        return trim($value, '_');
+    }
+
+    private function split_combined_address(string $raw_address): ?array
+    {
+        $raw_address = trim($raw_address);
+
+        if ($raw_address === '') {
+            return null;
+        }
+
+        if (! preg_match('/^\s*(\d{4})\s+([^,]+)\s*,\s*(.+)\s*$/u', $raw_address, $matches)) {
+            return null;
+        }
+
+        $zip = sanitize_text_field((string) $matches[1]);
+        $city = sanitize_text_field((string) trim($matches[2]));
+        $address = sanitize_text_field((string) trim($matches[3]));
+
+        if ($zip === '' || $city === '') {
+            return null;
+        }
+
+        return [
+            'zip'     => $zip,
+            'city'    => $city,
+            'address' => $address,
+        ];
+    }
+
+    private function find_existing_store_id(string $name, string $address, string $zip, string $city): int
+    {
+        if ($address !== '') {
+            $meta_query = [
+                [
+                    'key'     => '_sl_address',
+                    'value'   => $address,
+                    'compare' => '=',
+                ],
+            ];
+
+            if ($zip !== '') {
+                $meta_query[] = [
+                    'key'     => '_sl_zip',
+                    'value'   => $zip,
+                    'compare' => '=',
+                ];
+            }
+
+            if ($city !== '') {
+                $meta_query[] = [
+                    'key'     => '_sl_city',
+                    'value'   => $city,
+                    'compare' => '=',
+                ];
+            }
+
+            $posts = get_posts(
+                [
+                    'post_type'              => StorePostType::POST_TYPE,
+                    'post_status'            => ['publish', 'draft', 'pending', 'private'],
+                    'posts_per_page'         => 1,
+                    'fields'                 => 'ids',
+                    'orderby'                => 'ID',
+                    'order'                  => 'ASC',
+                    'meta_query'             => $meta_query,
+                    'suppress_filters'       => true,
+                    'ignore_sticky_posts'    => true,
+                    'no_found_rows'          => true,
+                    'update_post_meta_cache' => false,
+                    'update_post_term_cache' => false,
+                ]
+            );
+
+            if (! empty($posts) && isset($posts[0])) {
+                return (int) $posts[0];
+            }
+        }
+
+        if ($name === '') {
+            return 0;
+        }
+
         $posts = get_posts(
             [
                 'post_type'              => StorePostType::POST_TYPE,

@@ -18,6 +18,7 @@ final class StoreCsvSchema
         'latitude',
         'longitude',
         'status',
+        'product_ranges',
     ];
 
     public const WEEK_DAYS = [
@@ -28,6 +29,30 @@ final class StoreCsvSchema
         'friday',
         'saturday',
         'sunday',
+    ];
+
+    private const WEEK_DAY_ALIASES = [
+        'monday'    => 'monday',
+        'mon'       => 'monday',
+        'hetfo'     => 'monday',
+        'tuesday'   => 'tuesday',
+        'tue'       => 'tuesday',
+        'kedd'      => 'tuesday',
+        'wednesday' => 'wednesday',
+        'wed'       => 'wednesday',
+        'szerda'    => 'wednesday',
+        'thursday'  => 'thursday',
+        'thu'       => 'thursday',
+        'csutortok' => 'thursday',
+        'friday'    => 'friday',
+        'fri'       => 'friday',
+        'pentek'    => 'friday',
+        'saturday'  => 'saturday',
+        'sat'       => 'saturday',
+        'szombat'   => 'saturday',
+        'sunday'    => 'sunday',
+        'sun'       => 'sunday',
+        'vasarnap'  => 'sunday',
     ];
 
     public static function get_meta_map(): array
@@ -42,6 +67,7 @@ final class StoreCsvSchema
             'opening_hours' => '_sl_opening_hours',
             'latitude'      => '_sl_latitude',
             'longitude'     => '_sl_longitude',
+            'product_ranges'=> '_sl_product_ranges',
         ];
     }
 
@@ -98,7 +124,7 @@ final class StoreCsvSchema
             ];
         }
 
-        $pairs = preg_split('/\|/', $raw_value);
+        $pairs = preg_split('/[\|\r\n;]+/u', $raw_value);
         if (! is_array($pairs)) {
             return [
                 'json'  => '',
@@ -114,42 +140,31 @@ final class StoreCsvSchema
                 continue;
             }
 
-            if (! preg_match('/^([a-z]+)\s*[:=]\s*(.+)$/i', $pair, $matches)) {
+            if (! preg_match('/^(.+?)\s*[:=]\s*(.+)$/u', $pair, $matches)) {
                 return [
                     'json'  => '',
                     'error' => __('Invalid opening_hours segment. Use day=HH:MM-HH:MM.', 'store-locator'),
                 ];
             }
 
-            $day = strtolower(trim($matches[1]));
+            $day = self::resolve_week_day($matches[1]);
             $time_range = trim($matches[2]);
 
-            if (! in_array($day, self::WEEK_DAYS, true)) {
+            if ($day === '') {
                 return [
                     'json'  => '',
                     'error' => sprintf(
                         __('Invalid opening_hours day: %s', 'store-locator'),
-                        $day
+                        trim($matches[1])
                     ),
                 ];
             }
 
-            if ($time_range === '-') {
+            if (self::is_closed_time_value($time_range)) {
                 continue;
             }
 
-            if (! preg_match('/^([01]\d|2[0-3]):[0-5]\d\s*-\s*([01]\d|2[0-3]):[0-5]\d$/', $time_range)) {
-                return [
-                    'json'  => '',
-                    'error' => sprintf(
-                        __('Invalid opening_hours time range for %s.', 'store-locator'),
-                        $day
-                    ),
-                ];
-            }
-
-            $times = preg_split('/\s*-\s*/', $time_range);
-            if (! is_array($times) || count($times) !== 2) {
+            if (! preg_match('/^([01]?\d|2[0-3])[:.]([0-5]\d)\s*[-–]\s*([01]?\d|2[0-3])[:.]([0-5]\d)$/u', $time_range, $time_matches)) {
                 return [
                     'json'  => '',
                     'error' => sprintf(
@@ -160,8 +175,8 @@ final class StoreCsvSchema
             }
 
             $parsed[$day] = [
-                'from' => trim($times[0]),
-                'to'   => trim($times[1]),
+                'from' => sprintf('%02d:%02d', (int) $time_matches[1], (int) $time_matches[2]),
+                'to'   => sprintf('%02d:%02d', (int) $time_matches[3], (int) $time_matches[4]),
             ];
         }
 
@@ -179,5 +194,52 @@ final class StoreCsvSchema
             'error' => '',
         ];
     }
-}
 
+    private static function resolve_week_day(string $raw_day): string
+    {
+        $normalized = self::normalize_token($raw_day);
+
+        if (isset(self::WEEK_DAY_ALIASES[$normalized])) {
+            return self::WEEK_DAY_ALIASES[$normalized];
+        }
+
+        return in_array($normalized, self::WEEK_DAYS, true) ? $normalized : '';
+    }
+
+    private static function normalize_token(string $value): string
+    {
+        $value = trim($value);
+
+        if ($value === '') {
+            return '';
+        }
+
+        if (function_exists('remove_accents')) {
+            $value = remove_accents($value);
+        } elseif (function_exists('iconv')) {
+            $converted = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value);
+
+            if (is_string($converted) && $converted !== '') {
+                $value = $converted;
+            }
+        }
+
+        $value = strtolower($value);
+        $value = preg_replace('/[^a-z0-9]+/u', '', $value);
+
+        return is_string($value) ? $value : '';
+    }
+
+    private static function is_closed_time_value(string $value): bool
+    {
+        $trimmed = trim($value);
+
+        if ($trimmed === '-' || $trimmed === '–') {
+            return true;
+        }
+
+        $normalized = self::normalize_token($trimmed);
+
+        return in_array($normalized, ['zarva', 'closed', 'off'], true);
+    }
+}

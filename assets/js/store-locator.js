@@ -57,6 +57,10 @@
         html += "</ul>";
         html += "</div>";
 
+        if (store.product_ranges) {
+            html += "<p class=\"sl-details-product-ranges\">" + escapeHtml(store.product_ranges) + "</p>";
+        }
+
         return html;
     }
 
@@ -500,8 +504,8 @@
         var markerColor = config.markerColor || "#2e7d32";
         var bounds = [];
         var markerItems = [];
-        var useClustering = typeof window.L.markerClusterGroup === "function";
-        var clusterGroup = useClustering ? window.L.markerClusterGroup() : null;
+        var useClustering = false;
+        var clusterGroup = null;
 
         var icon = createMarkerIcon(markerImage, markerColor);
         var activeIcon = markerActiveImage ? createMarkerIcon(markerActiveImage, markerColor) : icon;

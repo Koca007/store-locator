@@ -4,7 +4,7 @@ Store Locator is a WordPress plugin that displays stores on a Leaflet map with f
 
 ## Version
 
-Current stable release: `1.0.0`
+Current stable release: `1.0.6`
 
 ## Main Features
 
@@ -60,13 +60,19 @@ Release flow:
 - Header row is supported (optional but recommended)
 - Sample file download is available on the Import / Export screen
 
-Supported columns:
+Import supports these canonical columns:
 
-`name,address,zip,city,phone,email,website,opening_hours,latitude,longitude,status`
+`name,address,zip,city,phone,email,website,opening_hours,latitude,longitude,status,product_ranges`
 
 `opening_hours` format example:
 
 `monday=07:00-16:00|tuesday=07:00-16:00|sunday=-`
+
+Import also supports Hungarian-style headers (for example `Cegnev`, `Telephely cime`, `Nyitvatartasi ido`, `Termekkorok`) and multi-line opening-hours values (for example `Hetfo: 07:00 - 16:30`).
+
+Export CSV format:
+
+`Cegnev,Telephely cime,Nyitvatartasi ido,Telefonszam,E-mail cim,Termekkorok`
 
 ## Repository
 

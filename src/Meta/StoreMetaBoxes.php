@@ -19,6 +19,7 @@ final class StoreMetaBoxes
         'phone'         => '_sl_phone',
         'email'         => '_sl_email',
         'website'       => '_sl_website',
+        'product_ranges'=> '_sl_product_ranges',
         'opening_hours' => '_sl_opening_hours',
     ];
 
@@ -89,6 +90,10 @@ final class StoreMetaBoxes
             <tr>
                 <th scope="row"><label for="sl_website"><?php echo esc_html($labels['website']); ?></label></th>
                 <td><input type="url" class="regular-text" id="sl_website" name="sl_store_meta[website]" value="<?php echo esc_attr($values['website']); ?>" /></td>
+            </tr>
+            <tr>
+                <th scope="row"><label for="sl_product_ranges"><?php echo esc_html($labels['product_ranges']); ?></label></th>
+                <td><input type="text" class="regular-text" id="sl_product_ranges" name="sl_store_meta[product_ranges]" value="<?php echo esc_attr($values['product_ranges']); ?>" /></td>
             </tr>
             <tr>
                 <th scope="row"><?php echo esc_html($labels['opening_hours']); ?></th>
@@ -325,6 +330,7 @@ final class StoreMetaBoxes
                 'phone'              => 'Telefonszam',
                 'email'              => 'E-mail',
                 'website'            => 'Weboldal',
+                'product_ranges'     => 'Termekkorok',
                 'opening_hours'      => 'Nyitvatartas',
                 'day'                => 'Nap',
                 'from'               => 'Mettol',
@@ -341,6 +347,7 @@ final class StoreMetaBoxes
                 'phone'              => 'Telefon',
                 'email'              => 'E-Mail',
                 'website'            => 'Webseite',
+                'product_ranges'     => 'Produktbereiche',
                 'opening_hours'      => 'Oeffnungszeiten',
                 'day'                => 'Tag',
                 'from'               => 'Von',
@@ -356,6 +363,7 @@ final class StoreMetaBoxes
             'phone'              => 'Phone',
             'email'              => 'Email',
             'website'            => 'Website',
+            'product_ranges'     => 'Product Ranges',
             'opening_hours'      => 'Opening Hours',
             'day'                => 'Day',
             'from'               => 'From',

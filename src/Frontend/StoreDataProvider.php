@@ -83,6 +83,7 @@ final class StoreDataProvider
                 'phone'         => (string) get_post_meta($post->ID, '_sl_phone', true),
                 'email'         => (string) get_post_meta($post->ID, '_sl_email', true),
                 'website'       => (string) get_post_meta($post->ID, '_sl_website', true),
+                'product_ranges'=> (string) get_post_meta($post->ID, '_sl_product_ranges', true),
                 'opening_hours' => $opening_hours,
                 'latitude'      => $latitude_raw !== '' && is_numeric($latitude_raw) ? (float) $latitude_raw : null,
                 'longitude'     => $longitude_raw !== '' && is_numeric($longitude_raw) ? (float) $longitude_raw : null,
