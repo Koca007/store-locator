@@ -268,6 +268,7 @@ final class StoreImporter
 
             $latitude = '';
             $longitude = '';
+            $coordinates_explicitly_provided = false;
 
             if ($latitude_raw !== '' || $longitude_raw !== '') {
                 if (! is_numeric($latitude_raw) || ! is_numeric($longitude_raw)) {
@@ -280,6 +281,7 @@ final class StoreImporter
 
                 $latitude = (string) (float) $latitude_raw;
                 $longitude = (string) (float) $longitude_raw;
+                $coordinates_explicitly_provided = true;
             }
 
             $existing_id = $this->find_existing_store_id($name, $address, $zip, $city);
@@ -319,8 +321,22 @@ final class StoreImporter
             $this->update_meta_value($post_id, '_sl_email', $email);
             $this->update_meta_value($post_id, '_sl_website', $website);
             $this->update_meta_value($post_id, '_sl_opening_hours', (string) $opening_hours_parsed['json']);
-            $this->update_meta_value($post_id, '_sl_latitude', $latitude);
-            $this->update_meta_value($post_id, '_sl_longitude', $longitude);
+            if ($coordinates_explicitly_provided) {
+                $this->update_meta_value($post_id, '_sl_latitude', $latitude);
+                $this->update_meta_value($post_id, '_sl_longitude', $longitude);
+            } else {
+                $existing_latitude = (string) get_post_meta($post_id, '_sl_latitude', true);
+                $existing_longitude = (string) get_post_meta($post_id, '_sl_longitude', true);
+
+                if ($existing_latitude === '' || $existing_longitude === '') {
+                    $result = $this->geocoding_service->geocode_address($address, $zip, $city);
+
+                    if ($result !== null) {
+                        $this->update_meta_value($post_id, '_sl_latitude', (string) $result->get_latitude());
+                        $this->update_meta_value($post_id, '_sl_longitude', (string) $result->get_longitude());
+                    }
+                }
+            }
             $this->update_meta_value($post_id, '_sl_product_ranges', $product_ranges);
 
             $source_hash = $this->geocoding_service->build_source_hash($address, $zip, $city);

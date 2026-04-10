@@ -4,7 +4,7 @@ Store Locator is a WordPress plugin that displays stores on a Leaflet map with f
 
 ## Version
 
-Current stable release: `1.0.6`
+Current stable release: `1.0.7`
 
 ## Main Features
 

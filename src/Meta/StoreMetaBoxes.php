@@ -16,6 +16,8 @@ final class StoreMetaBoxes
         'address'       => '_sl_address',
         'zip'           => '_sl_zip',
         'city'          => '_sl_city',
+        'latitude'      => '_sl_latitude',
+        'longitude'     => '_sl_longitude',
         'phone'         => '_sl_phone',
         'email'         => '_sl_email',
         'website'       => '_sl_website',
@@ -78,6 +80,20 @@ final class StoreMetaBoxes
             <tr>
                 <th scope="row"><label for="sl_city"><?php echo esc_html($labels['city']); ?></label></th>
                 <td><input type="text" class="regular-text" id="sl_city" name="sl_store_meta[city]" value="<?php echo esc_attr($values['city']); ?>" /></td>
+            </tr>
+            <tr>
+                <th scope="row"><label for="sl_latitude"><?php echo esc_html($labels['latitude']); ?></label></th>
+                <td>
+                    <input type="text" class="regular-text" id="sl_latitude" name="sl_store_meta[latitude]" value="<?php echo esc_attr($values['latitude']); ?>" />
+                    <p class="description"><?php echo esc_html($labels['latitude_help']); ?></p>
+                </td>
+            </tr>
+            <tr>
+                <th scope="row"><label for="sl_longitude"><?php echo esc_html($labels['longitude']); ?></label></th>
+                <td>
+                    <input type="text" class="regular-text" id="sl_longitude" name="sl_store_meta[longitude]" value="<?php echo esc_attr($values['longitude']); ?>" />
+                    <p class="description"><?php echo esc_html($labels['longitude_help']); ?></p>
+                </td>
             </tr>
             <tr>
                 <th scope="row"><label for="sl_phone"><?php echo esc_html($labels['phone']); ?></label></th>
@@ -209,12 +225,39 @@ final class StoreMetaBoxes
                 $url = esc_url_raw($raw_value);
                 return filter_var($url, FILTER_VALIDATE_URL) ? $url : '';
 
+            case 'latitude':
+                return $this->sanitize_coordinate($raw_value, true);
+
+            case 'longitude':
+                return $this->sanitize_coordinate($raw_value, false);
+
             case 'opening_hours':
                 return sanitize_textarea_field($raw_value);
 
             default:
                 return sanitize_text_field($raw_value);
         }
+    }
+
+    private function sanitize_coordinate(string $raw_value, bool $is_latitude): string
+    {
+        $value = str_replace(',', '.', trim($raw_value));
+
+        if ($value === '' || ! is_numeric($value)) {
+            return '';
+        }
+
+        $number = (float) $value;
+
+        if ($is_latitude && ($number < -90 || $number > 90)) {
+            return '';
+        }
+
+        if (! $is_latitude && ($number < -180 || $number > 180)) {
+            return '';
+        }
+
+        return (string) $number;
     }
 
     private function sanitize_opening_hours(array $raw_opening_hours): string
@@ -327,6 +370,10 @@ final class StoreMetaBoxes
                 'address'            => 'Cim',
                 'zip_code'           => 'Iranyitoszam',
                 'city'               => 'Varos',
+                'latitude'           => 'Szelesseg (lat)',
+                'longitude'          => 'Hosszusag (lng)',
+                'latitude_help'      => 'Tizedesfok, pl. 46.6439534. Uresen hagyva automatikus geokodolas hasznalhato.',
+                'longitude_help'     => 'Tizedesfok, pl. 18.2774545. Uresen hagyva automatikus geokodolas hasznalhato.',
                 'phone'              => 'Telefonszam',
                 'email'              => 'E-mail',
                 'website'            => 'Weboldal',
@@ -344,6 +391,10 @@ final class StoreMetaBoxes
                 'address'            => 'Adresse',
                 'zip_code'           => 'Postleitzahl',
                 'city'               => 'Stadt',
+                'latitude'           => 'Breitengrad (lat)',
+                'longitude'          => 'Laengengrad (lng)',
+                'latitude_help'      => 'Dezimalgrad, z.B. 46.6439534. Leer lassen fuer automatische Geokodierung.',
+                'longitude_help'     => 'Dezimalgrad, z.B. 18.2774545. Leer lassen fuer automatische Geokodierung.',
                 'phone'              => 'Telefon',
                 'email'              => 'E-Mail',
                 'website'            => 'Webseite',
@@ -360,6 +411,10 @@ final class StoreMetaBoxes
             'address'            => 'Address',
             'zip_code'           => 'ZIP Code',
             'city'               => 'City',
+            'latitude'           => 'Latitude (lat)',
+            'longitude'          => 'Longitude (lng)',
+            'latitude_help'      => 'Decimal degrees, e.g. 46.6439534. Leave empty to use automatic geocoding.',
+            'longitude_help'     => 'Decimal degrees, e.g. 18.2774545. Leave empty to use automatic geocoding.',
             'phone'              => 'Phone',
             'email'              => 'Email',
             'website'            => 'Website',

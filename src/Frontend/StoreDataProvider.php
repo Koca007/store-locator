@@ -20,6 +20,8 @@ final class StoreDataProvider
 
     public function get_stores(): array
     {
+        $allow_runtime_geocoding = (bool) apply_filters('sl_enable_runtime_geocoding', false);
+
         $posts = get_posts(
             [
                 'post_type'              => StorePostType::POST_TYPE,
@@ -52,9 +54,12 @@ final class StoreDataProvider
             $current_source_hash = $this->geocoding_service->build_source_hash($address, $zip, $city);
 
             if (
-                ($latitude_raw === '' || ! is_numeric($latitude_raw)) ||
-                ($longitude_raw === '' || ! is_numeric($longitude_raw)) ||
-                $stored_source_hash !== $current_source_hash
+                $allow_runtime_geocoding &&
+                (
+                    ($latitude_raw === '' || ! is_numeric($latitude_raw)) ||
+                    ($longitude_raw === '' || ! is_numeric($longitude_raw)) ||
+                    $stored_source_hash !== $current_source_hash
+                )
             ) {
                 $coordinates = $this->try_geocode_and_persist(
                     $post->ID,

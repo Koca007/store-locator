@@ -54,7 +54,11 @@ final class StoreGeocodingHandler
         $stored_latitude = (string) get_post_meta($post_id, self::META_LATITUDE, true);
         $stored_longitude = (string) get_post_meta($post_id, self::META_LONGITUDE, true);
 
-        if ($stored_source_hash === $source_hash && $stored_latitude !== '' && $stored_longitude !== '') {
+        if ($stored_latitude !== '' && $stored_longitude !== '') {
+            if ($stored_source_hash !== $source_hash) {
+                update_post_meta($post_id, self::META_SOURCE_HASH, $source_hash);
+            }
+
             return;
         }
 
@@ -69,4 +73,3 @@ final class StoreGeocodingHandler
         update_post_meta($post_id, self::META_SOURCE_HASH, $source_hash);
     }
 }
-
