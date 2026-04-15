@@ -238,6 +238,10 @@
     line-height: 1.35;
 }
 
+.sl-details-product-ranges-label {
+    font-weight: 700;
+}
+
 .sl-hours-day {
     color: var(--sl-info-hours-color);
     font-weight: 700;

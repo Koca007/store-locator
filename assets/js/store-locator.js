@@ -58,7 +58,7 @@
         html += "</div>";
 
         if (store.product_ranges) {
-            html += "<p class=\"sl-details-product-ranges\">" + escapeHtml(store.product_ranges) + "</p>";
+            html += "<p class=\"sl-details-product-ranges\"><span class=\"sl-details-product-ranges-label\">0%THM hitelre elérhető termékkörök:</span> " + escapeHtml(store.product_ranges) + "</p>";
         }
 
         return html;
