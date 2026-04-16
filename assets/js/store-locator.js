@@ -2,6 +2,36 @@
     "use strict";
 
     var locatorControllers = {};
+    function normalizeForCompare(value) {
+        var normalized = String(value || "").trim();
+
+        if (!normalized) {
+            return "";
+        }
+
+        if (typeof normalized.normalize === "function") {
+            normalized = normalized.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        }
+
+        normalized = normalized.toLowerCase().replace(/[^a-z0-9]+/g, " ");
+
+        return normalized.trim();
+    }
+
+    function normalizeZip(value) {
+        return String(value || "").replace(/[^\d]+/g, "").trim();
+    }
+
+    function normalizeHungarianCityQuery(value) {
+        var normalized = normalizeForCompare(value);
+        var suffixPattern = /(kent|bol|rol|tol|nal|nel|hoz|hez|hon|ban|ben|val|vel|ert|kor|ig|ra|re|ba|be|on|en|ot|at|et|t)$/;
+
+        if (normalized.length < 5) {
+            return normalized;
+        }
+
+        return normalized.replace(suffixPattern, "").trim();
+    }
 
     function escapeHtml(value) {
         return String(value || "")
@@ -131,8 +161,9 @@
     }
 
     function parseSearchQuery(query) {
-        var raw = String(query || "").toLowerCase().trim();
-        var tokens = raw.split(/[\s,;]+/).filter(Boolean);
+        var raw = String(query || "").trim();
+        var normalizedRaw = normalizeForCompare(raw);
+        var tokens = normalizedRaw.split(/[\s,;]+/).filter(Boolean);
         var zipParts = [];
         var cityParts = [];
 
@@ -147,28 +178,34 @@
 
         return {
             raw: raw,
+            normalizedRaw: normalizedRaw,
             cityQuery: cityParts.join(" "),
+            cityBaseQuery: normalizeHungarianCityQuery(cityParts.join(" ")),
             zipQuery: zipParts.join(" ")
         };
     }
 
-    function matchesFilter(store, cityQuery, zipQuery, rawQuery) {
-        var city = String(store.city || "").toLowerCase();
-        var zip = String(store.zip || "").toLowerCase();
-        var combined = (city + " " + zip).trim();
+    function matchesFilter(store, cityQuery, cityBaseQuery, zipQuery, normalizedRawQuery) {
+        var city = normalizeForCompare(store.city || "");
+        var zip = normalizeZip(store.zip || "");
+        var hasCityQuery = cityQuery !== "";
+        var hasZipQuery = zipQuery !== "";
+        var cityMatches = true;
+        var zipMatches = true;
 
-        if (!rawQuery) {
+        if (!normalizedRawQuery || (!hasCityQuery && !hasZipQuery)) {
             return true;
         }
 
-        if (combined.indexOf(rawQuery) !== -1) {
-            return true;
+        if (hasCityQuery) {
+            cityMatches = city === cityQuery || (cityBaseQuery !== "" && city === cityBaseQuery);
         }
 
-        var cityOk = cityQuery === "" || city.indexOf(cityQuery) !== -1;
-        var zipOk = zipQuery === "" || zip.indexOf(zipQuery) !== -1;
+        if (hasZipQuery) {
+            zipMatches = zip === zipQuery;
+        }
 
-        return cityOk && zipOk;
+        return cityMatches && zipMatches;
     }
 
     function levenshteinDistance(a, b) {
@@ -209,8 +246,8 @@
     }
 
     function normalizedTextDistance(query, value) {
-        var q = String(query || "").toLowerCase().trim();
-        var v = String(value || "").toLowerCase().trim();
+        var q = normalizeForCompare(query);
+        var v = normalizeForCompare(value);
 
         if (!q) {
             return 0;
@@ -228,8 +265,8 @@
     }
 
     function zipDistance(queryZip, storeZip) {
-        var q = String(queryZip || "").trim();
-        var s = String(storeZip || "").trim();
+        var q = normalizeZip(queryZip);
+        var s = normalizeZip(storeZip);
 
         if (!q) {
             return 0;
@@ -247,10 +284,10 @@
             return Math.min(Math.abs(qNum - sNum) / 1000, 1);
         }
 
-        return normalizedTextDistance(q, s);
+        return normalizedTextDistance(String(q), String(s));
     }
 
-    function selectNearestStore(stores, cityQuery, zipQuery) {
+    function selectNearestStoreByText(stores, cityQuery, zipQuery) {
         var candidates = stores.filter(function (store) {
             var lat = parseFloat(store.latitude);
             var lng = parseFloat(store.longitude);
@@ -275,11 +312,23 @@
             }
         });
 
-        return best;
+        if (best === null) {
+            return null;
+        }
+
+        return {
+            store: best,
+            score: bestScore
+        };
     }
 
-    function findMarkerByStoreId(markers, storeId) {
+    function findMarkerByStoreId(markers, markerLookupById, storeId) {
         var id = String(storeId);
+
+        if (markerLookupById && markerLookupById[id]) {
+            return markerLookupById[id];
+        }
+
         var found = null;
 
         markers.forEach(function (markerObj) {
@@ -393,10 +442,11 @@
     function applyFilter(controller, query) {
         var parsedQuery = parseSearchQuery(query);
         var cityQuery = parsedQuery.cityQuery;
+        var cityBaseQuery = parsedQuery.cityBaseQuery;
         var zipQuery = parsedQuery.zipQuery;
-        var rawQuery = parsedQuery.raw;
+        var normalizedRawQuery = parsedQuery.normalizedRaw;
         var filtered = controller.stores.filter(function (store) {
-            return matchesFilter(store, cityQuery, zipQuery, rawQuery);
+            return matchesFilter(store, cityQuery, cityBaseQuery, zipQuery, normalizedRawQuery);
         });
         var bounds = [];
         var matchedMarkers = [];
@@ -417,46 +467,32 @@
         clearMapEmptyMessage(controller.mapNode);
 
         if (filtered.length > 0) {
-            var selectedStore = filtered.length === 1 ? filtered[0] : selectNearestStore(filtered, cityQuery, zipQuery);
+            var selectedTextMatch = filtered.length === 1
+                ? { store: filtered[0], score: 0 }
+                : selectNearestStoreByText(filtered, cityQuery, zipQuery);
+            var selectedStore = selectedTextMatch ? selectedTextMatch.store : null;
 
             if (selectedStore !== null) {
-                var selectedMarker = findMarkerByStoreId(matchedMarkers, selectedStore.id);
+                var selectedMarker = findMarkerByStoreId(matchedMarkers, controller.markerLookupById, selectedStore.id);
                 if (selectedMarker !== null) {
                     var selectedLat = parseFloat(selectedStore.latitude);
                     var selectedLng = parseFloat(selectedStore.longitude);
                     var selectedZoom = Math.min(18, controller.defaultZoom + 2);
                     activateMarker(controller, selectedMarker, selectedStore, [selectedLat, selectedLng], selectedZoom);
-                    return;
+                    return Promise.resolve();
                 }
             }
 
             showMapEmptyMessage(controller.mapNode, controller.labels.no_map_data || "");
-            return;
+            return Promise.resolve();
         }
-
-        var nearest = selectNearestStore(controller.stores, cityQuery, zipQuery);
-
-        if (nearest !== null) {
-            var nearestMarker = findMarkerByStoreId(controller.markers, nearest.id);
-            if (nearestMarker !== null) {
-                var nearestLat = parseFloat(nearest.latitude);
-                var nearestLng = parseFloat(nearest.longitude);
-                var nearestZoom = Math.min(18, controller.defaultZoom + 2);
-                activateMarker(controller, nearestMarker, nearest, [nearestLat, nearestLng], nearestZoom);
-                showMapEmptyMessage(
-                    controller.mapNode,
-                    (controller.labels.nearest_fallback_prefix || "No exact match. Nearest shown:") + " " + nearest.name
-                );
-                return;
-            }
-        }
-
         if (controller.activeMarkerObj) {
             controller.activeMarkerObj.marker.setIcon(controller.defaultIcon);
             controller.activeMarkerObj = null;
         }
         closeDetailsPanel(controller);
         showMapEmptyMessage(controller.mapNode, controller.labels.no_results || controller.labels.no_map_data || "");
+        return Promise.resolve();
     }
 
     function initLocator(root) {
@@ -504,6 +540,7 @@
         var markerColor = config.markerColor || "#2e7d32";
         var bounds = [];
         var markerItems = [];
+        var markerLookupById = {};
         var useClustering = false;
         var clusterGroup = null;
 
@@ -523,6 +560,7 @@
                 store: store,
                 marker: marker
             };
+            markerLookupById[String(store.id)] = markerRef;
 
             marker.on("click", function () {
                 var controller = locatorControllers[group];
@@ -543,7 +581,7 @@
 
                 rememberMapView(controller);
                 var clickZoom = Math.min(18, defaultZoom + 2);
-                activateMarker(controller, markerRef, store, [lat, lng], clickZoom);
+                activateMarker(controller, markerRef, markerRef.store, [lat, lng], clickZoom);
             });
             if (useClustering && clusterGroup) {
                 clusterGroup.addLayer(marker);
@@ -572,6 +610,7 @@
             detailsGpsLinkNode: detailsGpsLinkNode,
             stores: stores,
             markers: markerItems,
+            markerLookupById: markerLookupById,
             useClustering: useClustering,
             clusterGroup: clusterGroup,
             defaultIcon: icon,
@@ -614,7 +653,12 @@
             }
 
             rememberMapView(controller);
-            applyFilter(controller, query);
+            applyFilter(controller, query).catch(function () {
+                showMapEmptyMessage(
+                    controller.mapNode,
+                    controller.labels.no_results || controller.labels.no_map_data || ""
+                );
+            });
         };
 
         submit.addEventListener("click", run);
