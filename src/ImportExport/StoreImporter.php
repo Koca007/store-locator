@@ -671,6 +671,12 @@ final class StoreImporter
             if (! empty($posts) && isset($posts[0])) {
                 return (int) $posts[0];
             }
+
+            // When an address is present but no exact address match exists, do not fall back to
+            // "name-only" matching, because chain/franchise imports often contain the same company
+            // name with multiple different addresses. Falling back by name would overwrite one row
+            // repeatedly and keep only the last address.
+            return 0;
         }
 
         if ($name === '') {
@@ -681,7 +687,7 @@ final class StoreImporter
             [
                 'post_type'              => StorePostType::POST_TYPE,
                 'post_status'            => ['publish', 'draft', 'pending', 'private'],
-                'posts_per_page'         => 1,
+                'posts_per_page'         => 2,
                 'title'                  => $name,
                 'orderby'                => 'ID',
                 'order'                  => 'ASC',
@@ -694,6 +700,11 @@ final class StoreImporter
         );
 
         if (empty($posts) || ! isset($posts[0]) || ! $posts[0] instanceof \WP_Post) {
+            return 0;
+        }
+
+        // Ambiguous name-only matches should not update a random existing record.
+        if (count($posts) > 1) {
             return 0;
         }
 
