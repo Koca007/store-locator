@@ -53,14 +53,12 @@ final class StoreDataProvider
             $stored_source_hash = (string) get_post_meta($post->ID, self::META_SOURCE_HASH, true);
             $current_source_hash = $this->geocoding_service->build_source_hash($address, $zip, $city);
 
-            if (
-                $allow_runtime_geocoding &&
-                (
-                    ($latitude_raw === '' || ! is_numeric($latitude_raw)) ||
-                    ($longitude_raw === '' || ! is_numeric($longitude_raw)) ||
-                    $stored_source_hash !== $current_source_hash
-                )
-            ) {
+            $missing_or_invalid_coordinates = (
+                ($latitude_raw === '' || ! is_numeric($latitude_raw)) ||
+                ($longitude_raw === '' || ! is_numeric($longitude_raw))
+            );
+
+            if ($allow_runtime_geocoding && $missing_or_invalid_coordinates) {
                 $coordinates = $this->try_geocode_and_persist(
                     $post->ID,
                     $address,
@@ -70,6 +68,9 @@ final class StoreDataProvider
                 );
                 $latitude_raw = $coordinates['latitude'];
                 $longitude_raw = $coordinates['longitude'];
+            } elseif ($stored_source_hash !== $current_source_hash) {
+                // Do not overwrite existing coordinates during frontend runtime lookups.
+                update_post_meta($post->ID, self::META_SOURCE_HASH, $current_source_hash);
             }
 
             $opening_hours_raw = (string) get_post_meta($post->ID, '_sl_opening_hours', true);

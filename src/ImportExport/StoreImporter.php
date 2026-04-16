@@ -9,6 +9,8 @@ use StoreLocator\PostType\StorePostType;
 
 final class StoreImporter
 {
+    private const META_SOURCE_HASH = '_sl_geocode_source_hash';
+
     private GeocodingService $geocoding_service;
 
     public function __construct(GeocodingService $geocoding_service)
@@ -352,6 +354,91 @@ final class StoreImporter
         return [
             'created' => $created,
             'updated' => $updated,
+            'errors'  => $errors,
+        ];
+    }
+
+    public function recalculate_coordinates(bool $overwrite_existing = true): array
+    {
+        $posts = get_posts(
+            [
+                'post_type'              => StorePostType::POST_TYPE,
+                'post_status'            => ['publish', 'draft', 'pending', 'private'],
+                'posts_per_page'         => -1,
+                'orderby'                => 'title',
+                'order'                  => 'ASC',
+                'suppress_filters'       => true,
+                'ignore_sticky_posts'    => true,
+                'no_found_rows'          => true,
+                'update_post_meta_cache' => true,
+                'update_post_term_cache' => false,
+            ]
+        );
+
+        $updated = 0;
+        $skipped = 0;
+        $failed = 0;
+        $errors = [];
+
+        foreach ($posts as $post) {
+            if (! $post instanceof \WP_Post) {
+                continue;
+            }
+
+            $post_id = (int) $post->ID;
+            $name = (string) get_the_title($post);
+            $address = (string) get_post_meta($post_id, '_sl_address', true);
+            $zip = (string) get_post_meta($post_id, '_sl_zip', true);
+            $city = (string) get_post_meta($post_id, '_sl_city', true);
+            $stored_latitude = (string) get_post_meta($post_id, '_sl_latitude', true);
+            $stored_longitude = (string) get_post_meta($post_id, '_sl_longitude', true);
+
+            if (
+                ! $overwrite_existing &&
+                $stored_latitude !== '' &&
+                is_numeric($stored_latitude) &&
+                $stored_longitude !== '' &&
+                is_numeric($stored_longitude)
+            ) {
+                $skipped++;
+                continue;
+            }
+
+            if (trim($address . $zip . $city) === '') {
+                $failed++;
+                $errors[] = sprintf(
+                    __('Store "%s": missing address context for geocoding.', 'store-locator'),
+                    $name !== '' ? $name : ('#' . $post_id)
+                );
+                continue;
+            }
+
+            $result = $this->geocoding_service->geocode_address($address, $zip, $city);
+
+            if ($result === null) {
+                $failed++;
+                $errors[] = sprintf(
+                    __('Store "%s": geocoding failed.', 'store-locator'),
+                    $name !== '' ? $name : ('#' . $post_id)
+                );
+                continue;
+            }
+
+            $latitude = (string) $result->get_latitude();
+            $longitude = (string) $result->get_longitude();
+            $source_hash = $this->geocoding_service->build_source_hash($address, $zip, $city);
+
+            update_post_meta($post_id, '_sl_latitude', $latitude);
+            update_post_meta($post_id, '_sl_longitude', $longitude);
+            update_post_meta($post_id, self::META_SOURCE_HASH, $source_hash);
+
+            $updated++;
+        }
+
+        return [
+            'updated' => $updated,
+            'skipped' => $skipped,
+            'failed'  => $failed,
             'errors'  => $errors,
         ];
     }

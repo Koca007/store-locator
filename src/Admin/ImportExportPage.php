@@ -15,6 +15,7 @@ final class ImportExportPage
     private const IMPORT_NONCE_ACTION = 'sl_import_stores';
     private const EXPORT_NONCE_ACTION = 'sl_export_stores';
     private const SAMPLE_NONCE_ACTION = 'sl_sample_stores';
+    private const RECALCULATE_NONCE_ACTION = 'sl_recalculate_store_coordinates';
     private const NOTICE_TRANSIENT_PREFIX = 'sl_import_notice_';
 
     private StoreImporter $importer;
@@ -32,6 +33,7 @@ final class ImportExportPage
         add_action('admin_post_sl_import_stores', [$this, 'handle_import']);
         add_action('admin_post_sl_export_stores', [$this, 'handle_export']);
         add_action('admin_post_sl_download_store_sample', [$this, 'handle_sample_download']);
+        add_action('admin_post_sl_recalculate_store_coordinates', [$this, 'handle_recalculate_coordinates']);
     }
 
     public function register_menu(): void
@@ -94,6 +96,32 @@ final class ImportExportPage
                 <input type="hidden" name="action" value="sl_export_stores" />
                 <?php wp_nonce_field(self::EXPORT_NONCE_ACTION, '_sl_nonce'); ?>
                 <?php submit_button(__('Export CSV', 'store-locator'), 'secondary', 'submit', false); ?>
+            </form>
+
+            <hr />
+
+            <h2><?php echo esc_html__('Recalculate coordinates', 'store-locator'); ?></h2>
+            <p>
+                <?php echo esc_html__('Bulk geocodes stores from address + ZIP + city. Useful when live coordinates drift from your source data.', 'store-locator'); ?>
+            </p>
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                <input type="hidden" name="action" value="sl_recalculate_store_coordinates" />
+                <?php wp_nonce_field(self::RECALCULATE_NONCE_ACTION, '_sl_nonce'); ?>
+                <label style="display:block;margin:0 0 10px;">
+                    <input type="checkbox" name="overwrite_existing" value="1" checked />
+                    <?php echo esc_html__('Overwrite existing coordinates too (recommended for full resync).', 'store-locator'); ?>
+                </label>
+                <?php
+                submit_button(
+                    __('Recalculate all store coordinates', 'store-locator'),
+                    'secondary',
+                    'submit',
+                    false,
+                    [
+                        'onclick' => "return confirm('" . esc_js(__('This may update many store coordinates. Continue?', 'store-locator')) . "');",
+                    ]
+                );
+                ?>
             </form>
         </div>
         <?php
@@ -201,6 +229,38 @@ final class ImportExportPage
 
         $this->exporter->stream_sample_csv();
         exit;
+    }
+
+    public function handle_recalculate_coordinates(): void
+    {
+        if (! current_user_can('manage_options')) {
+            wp_die(esc_html__('Permission denied.', 'store-locator'));
+        }
+
+        check_admin_referer(self::RECALCULATE_NONCE_ACTION, '_sl_nonce');
+
+        $overwrite_existing = isset($_POST['overwrite_existing']) && (string) wp_unslash($_POST['overwrite_existing']) === '1';
+        $result = $this->importer->recalculate_coordinates($overwrite_existing);
+
+        $updated = isset($result['updated']) ? (int) $result['updated'] : 0;
+        $skipped = isset($result['skipped']) ? (int) $result['skipped'] : 0;
+        $failed = isset($result['failed']) ? (int) $result['failed'] : 0;
+        $errors = isset($result['errors']) && is_array($result['errors']) ? $result['errors'] : [];
+
+        $message = sprintf(
+            __('Coordinate recalculation completed. Updated: %1$d, Skipped: %2$d, Failed: %3$d.', 'store-locator'),
+            $updated,
+            $skipped,
+            $failed
+        );
+
+        $type = $failed > 0 ? 'warning' : 'success';
+
+        $this->redirect_with_notice([
+            'type'    => $type,
+            'message' => $message,
+            'errors'  => array_slice($errors, 0, 20),
+        ]);
     }
 
     private function render_notice(): void

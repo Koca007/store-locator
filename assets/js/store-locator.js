@@ -134,8 +134,9 @@
                 className: "sl-custom-marker-icon",
                 html: "<span class=\"sl-custom-marker sl-custom-marker--image\" style=\"background-image:url('" + escapeHtml(markerImage) + "');\"></span>",
                 iconSize: [36, 36],
-                iconAnchor: [18, 18],
-                popupAnchor: [0, -18]
+                // Pin images should be anchored to their tip (bottom-center), not the icon center.
+                iconAnchor: [18, 36],
+                popupAnchor: [0, -36]
             });
         }
 
